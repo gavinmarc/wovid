@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       boxShadow: {
-        DEFAULT: '0 0 0 3px rgb(164 202 254 / 45%)',
+        DEFAULT: '0 0 0 3px rgb(75 85 99 / 45%)',
       }
     },
   },

@@ -8,11 +8,16 @@
 
   <link href="{{ asset('css/app.css') }}" rel="stylesheet">
 
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+
   <livewire:styles />
 </head>
-<body class="antialiased">
+<body class="min-h-full bg-fixed bg-cover bg-center  antialiased" style="background-image: url('assets/img/bg-mask.svg')">
 
-<div class="mx-auto my-16">
+  @include('partials.header')
+
+  <div class="mx-16 my-8">
     @yield('content')
   </div>
 
