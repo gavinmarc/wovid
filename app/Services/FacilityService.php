@@ -4,79 +4,72 @@ namespace App\Services;
 
 use App\Models\Facility;
 use Facades\App\Repositories\FacilityRepository;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
-use Str;
 
 class FacilityService
 {
-  private ?array $layouts = null;
+  private Collection $rows;
 
   public function refresh()
   {
     Facility::truncate();
 
-    $rows = FacilityRepository::fetch();
+    $facilities = $this->fetchRows()
+      ->formatRows()
+      ->fixSplittedRows();
 
-    foreach ($rows as $row) {
-      $attributes = collect($row)
-        ->map(fn ($item) => $this->flattenMatrix($item))
-        ->groupBy('x')
-        ->mapWithKeys(fn ($item) => $this->mergeGroup($item))
-        ->toArray();
-
-      $this->createFacility($attributes);
-    }
+    Facility::insert($facilities);
   }
 
-  private function createFacility(array $attributes)
+  private function fetchRows(): self
   {
-    $created = false;
+    $this->rows = FacilityRepository::fetchRows();
 
-    while (!$created) {
-      try {
-        Facility::create($attributes);
-        $created = true;
-      } catch (QueryException $e) {
-        preg_match('/(`(\w*)`.){3}/', $e->getMessage(), $matches);
-        $field = $matches[2];
-        $attributes[$field] = utf8_encode($attributes[$field]);
-      }
-    }
+    return $this;
   }
 
-  private function flattenMatrix(array $items): array
+  private function formatRows(): self
   {
-    return [
-      'x' => (int) floor($items[0][4]),
-      'y' => (int) floor($items[0][5]),
-      'text' => $items[1]
+    $keys = [
+      'district', 'post_code', 'street_address', 'facility_name', 'doctors', 'expertise', 'consultation_hours',
+      'appointment_phone', 'appointment_email', 'appointment_web', 'notes', 'website'
     ];
+
+    $this->rows =  $this->rows->forget(0)
+      // filter empty rows
+      ->reject(fn ($row) => empty(array_filter($row)))
+      // combine keys and values and sanitize values
+      ->map(function ($row) use ($keys) {
+        return array_map(
+          fn ($a) => trim(str_replace(["\n", "\t"], '', $a)),
+          array_combine($keys, $row)
+        );
+      });
+
+    return $this;
   }
 
-  private function mergeGroup(Collection $items): array
+  private function fixSplittedRows(): array
   {
-    $key = $this->getAttributeKey($items->first()['x']);
+    $facilities = [];
 
-    $value = (string) Str::of($items->pluck('text')->implode(''))
-      ->replace("\n", '')
-      ->trim();
+    foreach ($this->rows as $row) {
+      foreach ($row as $key => $value) {
+        if (empty($value)) continue;
 
-    return [$key => $value];
-  }
+        if ($key == 'district') {
+          $facilities[] = $row;
+          break;
+        }
 
-  private function getAttributeKey(int $x): string
-  {
-    if (!$this->layouts) {
-      $this->layouts = config('table-layouts');
-    }
-
-    foreach ($this->layouts as $attribute => $positions) {
-      if (in_array($x, $positions)) {
-        return $attribute;
+        // at the value to the previous facility
+        $index = count($facilities) - 1;
+        $facilities[$index][$key] .= $value;
+        break;
       }
     }
 
-    return 'undefined';
+    return $facilities;
   }
+
 }

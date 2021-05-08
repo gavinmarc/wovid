@@ -12,14 +12,10 @@ class RefreshFacilities extends Command
 
   public function handle()
   {
-    $this->call('scout:flush', [
-      'model' => Facility::class
-    ]);
+    $this->call('scout:flush', ['model' => Facility::class]);
 
     FacilityService::refresh();
 
-    $this->call('scout:import', [
-      'model' => Facility::class
-    ]);
+    $this->call('scout:import', ['model' => Facility::class]);
   }
 }

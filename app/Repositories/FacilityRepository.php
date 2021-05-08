@@ -2,38 +2,62 @@
 
 namespace App\Repositories;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Smalot\PdfParser\Parser;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 class FacilityRepository
 {
-  private array $needles = [
-    'Charlottenburg', 'Friedrichshain', 'Lichtenberg', 'Marzahn', 'Mitte', 'Neukölln',
-    'Pankow', 'Reinickendorf', 'Spandau', 'Steglitz', 'Tempelhof', 'Treptow',
-  ];
-
-  public function fetch(): array
+  public function fetchRows(): Collection
   {
+    File::cleanDirectory(
+      storage_path('temp')
+    );
+
     $url = config('services.kvberlin.url');
-    $parser = (new Parser)->parseFile($url);
+    $inputFilename = 'doctors-list.pdf';
+    Storage::disk('temp')->put("$inputFilename", file_get_contents($url));
 
-    $facilites = [];
-    $index = -1;
+    $outputFilename = 'output.json';
+    $this->executeCommand(
+      Storage::disk('temp')->path($inputFilename),
+      Storage::disk('temp')->path($outputFilename)
+    );
 
-    foreach ($parser->getPages() as $page) {
-      foreach ($page->getDataTm() as $matrix) {
-        if (Str::startsWith($matrix[1], $this->needles)) {
-          $index++;
-        }
+    $filepaths = File::glob(
+      Storage::disk('temp')->path('output*.json')
+    );
 
-        if ($index < 0 || preg_match('/Übersicht:.*|Seite \d von \d/', $matrix[1])) {
-          continue;
-        }
-
-        $facilites[$index][] = $matrix;
-      }
+    $rows = collect();
+    foreach ($filepaths as $filepath) {
+      $rows = $rows->concat(
+        json_decode(file_get_contents($filepath), true)
+      );
     }
 
-    return $facilites;
+    return $rows;
+  }
+
+  private function executeCommand(string $inputFile, string $outputFile)
+  {
+    $format = (string) Str::of($outputFile)->match('/\.([a-z]*)$/');
+
+    $process = new Process([
+      'camelot',
+      '--pages', 'all',
+      '--format', $format,
+      '--output', $outputFile,
+      'lattice',
+      $inputFile
+    ]);
+
+    $process->run();
+
+    if (!$process->isSuccessful()) {
+      throw new ProcessFailedException($process);
+    }
   }
 }
