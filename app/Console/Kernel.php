@@ -24,7 +24,7 @@ class Kernel extends ConsoleKernel
    */
   protected function schedule(Schedule $schedule)
   {
-     $schedule->command('wovid:refresh-facilities')->hourly();
+    $schedule->command('wovid:refresh-facilities')->hourly();
   }
 
   /**

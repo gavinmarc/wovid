@@ -55,7 +55,9 @@ class FacilityService
 
     foreach ($this->rows as $row) {
       foreach ($row as $key => $value) {
-        if (empty($value)) continue;
+        if (empty($value)) {
+          continue;
+        }
 
         if ($key == 'district') {
           $facilities[] = $row;
@@ -71,5 +73,4 @@ class FacilityService
 
     return $facilities;
   }
-
 }
